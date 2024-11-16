@@ -1,18 +1,14 @@
 import math
-import os
 import threading
 
 import cv2
 import numpy as np
 import pygame
-import scipy
+import torch
+from pygame import display, event, transform, mouse, draw, Rect, time, font
 from scipy.spatial.transform import Rotation
 
 import tracking_and_selection
-import torch
-
-from pygame import display, event, transform, mouse, draw, Rect, time, font
-
 from depth_estimator import DepthEstimator
 from util import mask_to_surface, ndarray_to_surface
 
@@ -29,12 +25,13 @@ cam.set(cv2.CAP_PROP_FRAME_WIDTH, VIDEO_WIDTH)
 cam.set(cv2.CAP_PROP_FRAME_HEIGHT, VIDEO_HEIGHT)
 cam.set(cv2.CAP_PROP_FPS, 60)
 
+clockity = time.Clock()
+
 target_box = None
 running = True
 dragging = False
 click_start_pos = None
 click_end_pos = None
-clockity = time.Clock()
 tracking_visualized = None
 tracking_detections = None
 depth_info = None
