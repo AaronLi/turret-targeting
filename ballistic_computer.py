@@ -20,11 +20,13 @@ class BallisticComputer:
         self.drag_coefficient = drag_coefficient
         self.muzzle_velocity = muzzle_velocity
 
-    def __create_equation(self, rel_y: sympy.NumberSymbol, rel_z: sympy.NumberSymbol, flight_time_sym: sympy.NumberSymbol):
+    def __create_equation(self, rel_y: float, rel_z: float, flight_time: sympy.NumberSymbol):
         gravity = sympy.RealNumber(BallisticComputer.GRAVITY)
         muzzle_velocity = sympy.RealNumber(self.muzzle_velocity)
+        rel_y = sympy.RealNumber(rel_y)
+        rel_z = sympy.RealNumber(rel_z)
 
-        equation = rel_y - (muzzle_velocity * sympy.sqrt(1 - ((rel_z / muzzle_velocity) / flight_time_sym) ** 2) * flight_time_sym) + (flight_time_sym ** 2) * gravity / 2
+        equation = rel_y - (muzzle_velocity * sympy.sqrt(1 - ((rel_z / muzzle_velocity) / flight_time) ** 2) * flight_time) + (flight_time ** 2) * gravity / 2
 
         return equation
 
@@ -36,11 +38,9 @@ class BallisticComputer:
         :return: Targeting Solutions [(Aim Elevation (radians), Flight Time (seconds))]
         '''
 
-        target_rel_y_symbol, target_rel_z_symbol, flight_time_symbol = sympy.symbols('target_rel_y target_rel_z flight_time')
+        flight_time_symbol = sympy.symbols('flight_time')
 
-        eq = self.__create_equation(target_rel_y_symbol, target_rel_z_symbol, flight_time_symbol) \
-              .subs(target_rel_y_symbol, target_rel_y) \
-              .subs(target_rel_z_symbol, target_rel_z)
+        eq = self.__create_equation(target_rel_y, target_rel_z, flight_time_symbol)
 
         solutions = {(math.acos(target_rel_z / flight_time / self.muzzle_velocity), flight_time) for flight_time in sympy.solveset(eq, flight_time_symbol, sympy.Reals) if -1 < (target_rel_z / flight_time / self.muzzle_velocity) < 1}
 
