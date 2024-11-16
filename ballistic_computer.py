@@ -1,8 +1,10 @@
+import itertools
 import math
 from typing import Set, Tuple
 
 import numpy as np
 import sympy
+from triton.language import dtype
 
 
 class BallisticComputer:
@@ -26,11 +28,15 @@ class BallisticComputer:
         rel_y = sympy.RealNumber(rel_y)
         rel_z = sympy.RealNumber(rel_z)
 
-        equation = rel_y - (muzzle_velocity * sympy.sqrt(1 - ((rel_z / muzzle_velocity) / flight_time) ** 2) * flight_time) + (flight_time ** 2) * gravity / 2
+        equations = [
+            muzzle_velocity * -sympy.sqrt(1 - ((rel_z / muzzle_velocity) / flight_time) ** 2) * flight_time - (
+                        gravity / 2) * flight_time ** 2 - rel_y,
+            muzzle_velocity * sympy.sqrt(1 - ((rel_z / muzzle_velocity) / flight_time) ** 2) * flight_time - (
+                        gravity / 2) * flight_time ** 2 - rel_y
+        ]
+        return equations
 
-        return equation
-
-    def calculate_elevation(self, target_rel_y: float, target_rel_z: float) -> Set[Tuple[float, float]]:
+    def calculate_elevation(self, target_rel_y: float, target_rel_z: float) -> np.ndarray:
         '''
         Calculate pitch angle (degrees)
         :param target_rel_y: Vertical Distance relative (m)
@@ -38,13 +44,22 @@ class BallisticComputer:
         :return: Targeting Solutions [(Aim Elevation (radians), Flight Time (seconds))]
         '''
 
+        if target_rel_z < 0:
+            return np.empty(0)
+
         flight_time_symbol = sympy.symbols('flight_time')
 
-        eq = self.__create_equation(target_rel_y, target_rel_z, flight_time_symbol)
+        eqs = self.__create_equation(target_rel_y, target_rel_z, flight_time_symbol)
 
-        solutions = {(math.acos(target_rel_z / flight_time / self.muzzle_velocity), flight_time) for flight_time in sympy.solveset(eq, flight_time_symbol, sympy.Reals) if -1 < (target_rel_z / flight_time / self.muzzle_velocity) < 1}
+        solutions = np.array(list(itertools.chain(list(sympy.solveset(eq, flight_time_symbol, sympy.Reals)) for eq in eqs)), dtype=np.float64)
 
-        return solutions
+        solutions = solutions[solutions > 0]
+
+        intermediate_terms = ((target_rel_y + solutions ** 2 * BallisticComputer.GRAVITY / 2) / solutions / self.muzzle_velocity)
+
+        valid_solutions = np.logical_and(-1 <= intermediate_terms, intermediate_terms <= 1)
+
+        return np.hstack((np.arcsin(intermediate_terms[valid_solutions].reshape((-1, 1))), solutions[valid_solutions].reshape((-1, 1))))
 
 
 if __name__ == '__main__':
@@ -58,6 +73,6 @@ if __name__ == '__main__':
 
     computer = BallisticComputer()
 
-    solutions = computer.calculate_elevation(1, 10)
+    solutions = computer.calculate_elevation(-1, 10)
     print(solutions)
     print([evaluate_projectile_motion(angle, flight_time, computer.muzzle_velocity) for (angle, flight_time) in solutions])
